@@ -3,6 +3,7 @@ FROM amazonlinux:latest
 RUN yum update -y
 RUN yum install -y sudo gcc g++ make git zip unzip tar bzip2 wget jq openssl uuid which -y
 RUN yum install -y python3
+RUN amazon-linux-extras install docker
 ## VSCODE USER Setup
 RUN adduser vscode
 RUN usermod -aG wheel vscode

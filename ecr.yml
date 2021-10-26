@@ -1,0 +1,23 @@
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Lambda Image Repository
+Parameters:
+  Name:
+    Type: String  
+Resources:
+  LambdaImage: 
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Ref Name
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement: 
+          - Sid: AllowLambdaPull
+            Effect: Allow
+            Principal: 
+              Service: "lambda.amazonaws.com"
+            Action: 
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              
