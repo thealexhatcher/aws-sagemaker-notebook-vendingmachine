@@ -1,0 +1,36 @@
+Parameters:
+  InstanceType:
+    Description: The type of ML compute instance to launch for the notebook
+    Type: String
+    Default: ml.t2.medium
+    AllowedValues:
+      - ml.t2.medium
+      - ml.t2.large
+      - ml.t2.xlarge
+      - ml.m5.large
+      - ml.m5.xlarge
+
+Resources:
+  NotebookInstance:
+    Type: "AWS::SageMaker::NotebookInstance"
+    Properties:
+      DirectInternetAccess: Enabled
+      NotebookInstanceName: !Sub '${AWS::StackName}'
+      InstanceType: !Ref InstanceType
+      RoleArn: !GetAtt NotebookRole.Arn
+      Tags:
+        - { Key: Name, Value: !Sub '${AWS::StackName}' }
+
+  NotebookRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - sagemaker.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"

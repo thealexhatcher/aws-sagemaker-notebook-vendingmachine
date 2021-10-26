@@ -1,0 +1,32 @@
+
+   
+{
+	"name": "AWS Sagemaker Notebooks Vending Machine",
+	"dockerFile": "Dockerfile",
+	"settings": { 
+		"terminal.integrated.profiles.linux": {
+			"bash": {
+				"path": "bash",
+				"icon": "star",
+				"env": {
+					"PLACEHOLDER": "place_holder"
+				}
+			},
+		},
+		"terminal.integrated.defaultProfile.linux": "bash",
+		"terminal.integrated.cwd": "${workspaceFolder}",
+		"terminal.activateEnvironment":	true,
+		//"python.languageServer": "Pylance",
+		"python.linting.pylintEnabled": true,
+		"python.linting.enabled": true,
+		"python.defaultInterpreterPath": "${workspaceFolder}/env/bin/python",
+		"python.pythonPath": "${workspaceFolder}/env/bin/python",
+
+	},
+	"remoteUser": "vscode",
+	"postCreateCommand": "python3 -m venv env && . env/bin/activate",
+	"extensions": [
+		"ms-python.python",
+		//"ms-python.vscode-pylance"
+	]
+}

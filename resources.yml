@@ -1,0 +1,249 @@
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Sagemaker Notebook Template Parent
+Parameters:
+  Environment:
+    Type: String   
+Resources:
+###
+# API 
+###
+
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Sagemaker Notebook API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Sub ${AWS::StackName}-${Environment}-apigateway
+
+  apiGatewayVersionResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Sub ${apiGateway}
+      ParentId: !Sub ${apiGateway.RootResourceId}
+      PathPart: 'v1'
+
+  apiGatewaysmnbstackcreateResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Sub ${apiGateway}
+      ParentId: !Sub ${apiGatewayVersionResource}
+      PathPart: 'smnbstackcreate'
+
+  apiGatewaysmnbstackinfoResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Sub ${apiGateway}
+      ParentId: !Sub ${apiGatewayVersionResource}
+      PathPart: 'smnbstackinfo'
+
+  apiGatewayDeployment:
+    DependsOn:
+      - smnbstackcreateApiGatewayMethod
+      - smnbstackinfoApiGatewayMethod
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref apiGateway
+
+###
+# Stack Create Function
+###
+
+  smnbstackcreateFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.8
+      Role: !GetAtt smnbstackcreateLambdaRole.Arn
+      Handler: app.handler
+      Timeout: 120
+      Environment:
+        Variables:
+          EXAMPLE_VAR: "value"
+      PackageType: Image  
+      Code:
+        ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackcreate:latest  
+      TracingConfig:
+        Mode: Active
+
+  smnbstackcreateApiGatewayMethod:
+    DependsOn: smnbstackcreateFunction
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${smnbstackcreateFunction.Outputs.FunctionArn}/invocations
+      ResourceId: !GetAtt apiGateway.RootResourceId
+      RestApiId: !Ref apiGateway
+
+  smnbstackcreateFunctionApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Sub ${smnbstackcreateFunction.Outputs.FunctionArn}
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*
+
+###
+# Stack Info Function
+###
+
+  smnbstackinfoFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.8
+      Role: !GetAtt smnbstackinfoLambdaRole.Arn
+      Handler: app.handler
+      Timeout: 120
+      Environment:
+        Variables:
+          EXAMPLE_VAR: "value"
+      PackageType: Image
+      Code:
+        #S3Bucket: !Ref AWS::NoValue
+        ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackinfo:latest
+      TracingConfig:
+        Mode: Active
+
+  smnbstackinfoApiGatewayMethod:
+    DependsOn: smnbstackcreateFunction
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${smnbstackinfoFunction.Outputs.FunctionArn}/invocations
+      ResourceId: !GetAtt apiGateway.RootResourceId
+      RestApiId: !Ref apiGateway
+
+  smnbstackinfoFunctionApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Sub ${smnbstackinfoFunction.Outputs.FunctionArn}
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*
+
+###
+# Clean Up
+###
+
+  smnbstackcleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Handler: handler.function
+      Timeout: 120
+      PackageType: Image
+      Code:
+        ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackcleanup:latest
+      Environment:
+        Variables:
+          PROVISIONED_PRODUCT_MAX_TTL_SEC: 86400
+      Events:
+        CheckProductScheduledEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+
+###
+# Roles 
+###
+
+  smnbstackcreateLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: Policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - "logs:CreateLogGroup"
+              Resource: "*"
+      Path: "/"
+
+  smnbstackinfoLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: Policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - "logs:CreateLogGroup"
+              Resource: "*"
+      Path: "/"
+
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: logs_policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - "logs:CreateLogGroup"
+                - "logs:CreateLogStream"
+                - "logs:PutLogEvents"
+              Resource: "*"
+        - PolicyName: cf_policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - "cloudformation:Describe*"
+              Resource: "*"
+      Path: "/"
+
+Outputs:
+  
+  smnbstackcreateInvokeURL:
+    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${apiGatewayVersionResource}/${apiGatewaysmnbstackcreateResource}
+  smnbstackinfoInvokeURL:
+    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${apiGatewayVersionResource}/${apiGatewaysmnbstackinfoResource}
+  smnbstackcreateFunctionArn:
+    Value: !Sub smnbstackcreateFunction.Arn
+  smnbstackinfoFunctionArn:
+    Value: !Sub smnbstackinfoFunction.Arn
+  
