@@ -1,4 +1,4 @@
-def handler(event, context): 
+def function(event, context): 
 
     stack_id = 'USER_PROVIDED'
 

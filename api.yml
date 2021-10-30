@@ -3,6 +3,8 @@ Description: >
   Sagemaker Notebook VendingMachine Template
 Parameters:
   Environment:
+    Type: String
+  ImageName:
     Type: String   
 Resources:
 ###
@@ -16,12 +18,16 @@ Resources:
   smnbstackcreateFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python3.8
       Role: !GetAtt smnbstackcreateLambdaRole.Arn
-      Handler: app.handler
       Timeout: 120
       PackageType: Image  
-      ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackcreate:latest  
+      ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageName}:latest  
+      ImageConfig:
+        Command: 
+          - create.handler
+        EntryPoint: 
+          - /lambda-entrypoint.sh
+        WorkingDirectory: /var/task
       Events:
         ApiEvent:
           Type: Api
@@ -34,12 +40,16 @@ Resources:
   smnbstackinfoFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python3.8
       Role: !GetAtt smnbstackinfoLambdaRole.Arn
-      Handler: app.handler
       Timeout: 120
       PackageType: Image
-      ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackinfo:latest
+      ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImageName}:latest
+      ImageConfig:
+        Command: 
+          - info.handler
+        EntryPoint: 
+          - /lambda-entrypoint.sh
+        WorkingDirectory: /var/task
       Events:
         ApiEvent:
           Type: Api
@@ -52,13 +62,16 @@ Resources:
   smnbstackcleanupFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python3.8
       Role: !GetAtt smnbstackcleanupLambdaRole.Arn
-      Handler: handler.function
       Timeout: 120
       PackageType: Image
-      Code:
-        ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/smnbstackcleanup:latest
+      ImageUri: ${AWS::Account}.dkr.ecr.${AWS::Region}.amazonaws.com/{ImageName}:latest
+      ImageConfig:
+        Command: 
+          - cleanup.function
+        EntryPoint: 
+          - /lambda-entrypoint.sh
+        WorkingDirectory: /var/task
       Environment:
         Variables:
           PROVISIONED_PRODUCT_MAX_TTL_SEC: 86400
@@ -71,6 +84,7 @@ Resources:
 ###
 # Roles 
 ###
+
   smnbstackcreateLambdaRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -100,6 +114,8 @@ Resources:
             Statement:
             - Effect: Allow
               Action:
+                - "cloudformation:CreateStack"
+                - "cloudformation:UpdateStack"
                 - "cloudformation:Describe*"
               Resource: "*"
       Path: "/"
@@ -171,18 +187,14 @@ Resources:
       Path: "/"
 
 Outputs:
-
-  
-  smnbstackcreateInvokeURL:
-    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${apiGatewayVersionResource}/${apiGatewaysmnbstackcreateResource}
-  smnbstackinfoInvokeURL:
-    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${apiGatewayVersionResource}/${apiGatewaysmnbstackinfoResource}
-  smnbstackcreateFunctionArn:
-    Value: !Sub smnbstackcreateFunction.Arn
-  smnbstackinfoFunctionArn:
-    Value: !Sub smnbstackinfoFunction.Arn
-  smnbstackcleanupFunctionArn:
-    Value: !Sub smnbstackcleanupFunction.Arn
+  InvokeURL:
+    Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod
+  smnbstackcreateFunction:
+    Value: !Sub smnbstackcreateFunction
+  smnbstackinfoFunction:
+    Value: !Sub smnbstackinfoFunction
+  smnbstackcleanupFunction:
+    Value: !Sub smnbstackcleanupFunction
   
 
   

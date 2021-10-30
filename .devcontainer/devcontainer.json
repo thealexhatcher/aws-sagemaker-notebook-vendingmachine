@@ -24,7 +24,8 @@
 
 	},
 	"remoteUser": "vscode",
-	"postCreateCommand": "python3 -m venv env && . env/bin/activate",
+	"postCreateCommand": "bash -e '(sudo dockerd > /tmp/dockerd.log 2>&1 ) &' && python3 -m venv env && . env/bin/activate",
+	"runArgs": ["--privileged"],
 	"extensions": [
 		"ms-python.python",
 		//"ms-python.vscode-pylance"

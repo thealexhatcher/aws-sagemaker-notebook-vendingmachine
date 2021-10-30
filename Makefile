@@ -1,38 +1,43 @@
-SHELL := /bin/bash
-STACKNAME?= "aws-sagemaker-notebook-vendingmachine"
+SHELL:=/bin/bash
+REGION=us-east-1
+ACCOUNT_ID = $(shell aws sts get-caller-identity --query Account --output text)
 ENVIRONMENT?= "local"
-REGION="us-east-1"
-ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+STACKNAME?= "aws-sagemaker-notebook-vendingmachine"
+APP_NAME?= sm_nb_function
+IMAGE_NAME?= $(subst _,-,$(APP_NAME))
 
-validate_cfn: 
+
+deploy_ecr:
+	aws cloudformation deploy --stack-name $(STACKNAME)-ecr --template-file ecr.yml --parameter-overrides Name=$(IMAGE_NAME)
+
+destroy_ecr:
+	aws cloudformation delete-stack --stack-name $(STACKNAME)-ecr && aws cloudformation wait stack-delete-complete --stack-name $(STACKNAME)
+
+
+build:
+	cd $(APP_NAME) \
+	docker build -t $(APP_NAME) . \
+	&& cd -
+
+test:
+	docker run -p 9000:8080 hello-world 
+	curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
+
+push: build
+	cd $(APP_NAME) \
+	&& aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com \
+	&& docker tag $(APP_NAME):latest $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(IMAGE_NAME):latest \
+	&& docker push $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/$(IMAGE_NAME):latest \
+	&& cd -
+
+cfn_validate: 
 	aws cloudformation validate-template --template-body file://ecr.yml --output text
 	aws cloudformation validate-template --template-body file://api.yml --output text
 
-init:
-	aws cloudformation deploy --stack-name sm_nb_stack_cleanup --template-file ecr.yml --parameter-overrides Name=sm_nb_stack_cleanup
-	aws cloudformation deploy --stack-name sm_nb_stack_create --template-file ecr.yml --parameter-overrides Name=sm_nb_stack_create
-	aws cloudformation deploy --stack-name sm_nb_stack_info --template-file ecr.yml --parameter-overrides Name=sm_nb_stack_info
-
-push: init 
-	aws ecr get-login-password --region $(REGION) | docker login --username AWS --password-stdin $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com
-	cd sm_nb_stack_cleanup \
-	&& docker build -t sm_nb_stack_cleanup:latest -t $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_cleanup:latest .
-	&& docker push $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_cleanup:latest
-	&& cd -
-	cd sm_nb_stack_create \
-	&& docker build -t sm_nb_stack_create:latest -t $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_create:latest .
-	&& docker push $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_create:latest
-	&& cd -
-	cd sm_nb_stack_info
-	&& docker build -t sm_nb_stack_info:latest -t $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_info:latest . 
-	&& docker push $(ACCOUNT_ID).dkr.ecr.$(REGION).amazonaws.com/sm_nb_stack_info:latest
-	&& cd - 
-
-deploy:  validate push
-	aws cloudformation deploy --stack-name $(STACKNAME)-$(ENVIRONMENT) --template-file api.yml --parameter-overrides file://api.params.$(ENVIRONMENT).json --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND 
+deploy: cfn_validate push
+	aws cloudformation deploy --stack-name $(STACKNAME)-$(ENVIRONMENT) --template-file api.yml --parameter-overrides Environment=$(ENVIRONMENT),ImageName=$(IMAGE_NAME) --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND 
 
 destroy:
-	aws cloudformation delete-stack --stack-name $(STACKNAME)
-	aws cloudformation delete-stack --stack-name sm_nb_stack_cleanup 
-	aws cloudformation delete-stack --stack-name sm_nb_stack_create 
-	aws cloudformation delete-stack --stack-name sm_nb_stack_info
+	aws cloudformation delete-stack --stack-name $(STACKNAME) && aws cloudformation wait stack-delete-complete --stack-name $(STACKNAME)
+
+

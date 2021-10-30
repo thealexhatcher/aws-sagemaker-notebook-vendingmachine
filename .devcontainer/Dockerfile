@@ -7,6 +7,7 @@ RUN amazon-linux-extras install docker
 ## VSCODE USER Setup
 RUN adduser vscode
 RUN usermod -aG wheel vscode
+RUN usermod -aG docker vscode
 RUN echo '%vscode ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 ## AWS CLI
 RUN wget --quiet "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -O ~/awscliv2.zip \

@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def handler(event, context):
+def function(event, context):
     provisioned_product_max_ttl_sec = os.environ['PROVISIONED_PRODUCT_MAX_TTL_SEC']
     sc_client = boto3.client('servicecatalog')
     response = sc_client.scan_provisioned_products(AccessLevelFilter={'Key': 'Account', 'Value': 'self'})

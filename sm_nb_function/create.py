@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger()
 
-def handler(event, context):
+def function(event, context):
     logger.setLevel(logging.INFO)
     with open('resources/cfn_sm_nb.yml') as template_fileobj:
         template_data = template_fileobj.read()
